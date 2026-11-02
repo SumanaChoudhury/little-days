@@ -1,0 +1,25 @@
+# =========================================================================
+# Render Blueprint Specification for little days.
+# =========================================================================
+# Deploy this project directly to Render (https://render.com)
+# =========================================================================
+
+services:
+  - type: web
+    name: little-days
+    runtime: static
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: SAMEORIGIN
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_ANON_KEY
+        sync: false
