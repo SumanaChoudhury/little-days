@@ -218,14 +218,68 @@ export const authService = {
   deleteAccount(): void {
     const currentUser = this.getCurrentUser();
     if (currentUser) {
-      const users = this.getAllUsers().filter(u => u.id !== currentUser.id);
+      const users = this.getAllUsers().filter(u => u.id !== currentUser.id && u.username.toLowerCase() !== currentUser.username.toLowerCase());
       localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
     }
-    // Wipe current user's session and all stored content
+    // Wipe current user's session and all stored content completely
     localStorage.removeItem(AUTH_STORAGE_KEY);
     localStorage.removeItem('insta_fresh_memories');
     localStorage.removeItem('insta_fresh_stories');
     localStorage.removeItem('insta_fresh_highlights');
     localStorage.removeItem('insta_fresh_archives');
+    localStorage.removeItem('insta_fresh_journals');
+    localStorage.removeItem('insta_fresh_moods');
+    localStorage.removeItem('insta_fresh_capsules');
+    localStorage.removeItem('insta_fresh_letters');
+    localStorage.removeItem('insta_fresh_moodboards');
+    localStorage.removeItem('insta_fresh_profile');
+    localStorage.removeItem('insta_fresh_dms');
+  },
+
+  purgeAutoCreatedAccount(): void {
+    try {
+      const current = this.getCurrentUser();
+      // If current user is the old mock or has the dummy unsplash avatar
+      if (current && (current.avatarUrl?.includes('unsplash') || current.avatarUrl?.includes('1534528741775-53994a69daeb') || current.id === 'user-sumana-mock')) {
+        this.deleteAccount();
+      }
+
+      // Filter out any mock users from registry
+      const users = this.getAllUsers();
+      const filtered = users.filter(u => 
+        !u.avatarUrl?.includes('1534528741775-53994a69daeb') && 
+        !u.avatarUrl?.includes('unsplash') &&
+        u.id !== 'user-sumana-mock'
+      );
+      localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(filtered));
+
+      // Remove any mock stories with unsplash
+      const storiesRaw = localStorage.getItem('insta_fresh_stories');
+      if (storiesRaw) {
+        const stories = JSON.parse(storiesRaw);
+        const filteredStories = stories.filter((s: any) => 
+          !s.mediaUrl?.includes('unsplash') && 
+          !s.user?.avatar?.includes('1534528741775-53994a69daeb')
+        );
+        localStorage.setItem('insta_fresh_stories', JSON.stringify(filteredStories));
+      }
+
+      // Remove any mock highlights with unsplash
+      const hlRaw = localStorage.getItem('insta_fresh_highlights');
+      if (hlRaw) {
+        const hls = JSON.parse(hlRaw);
+        const filteredHls = hls.filter((h: any) => !h.coverUrl?.includes('unsplash'));
+        localStorage.setItem('insta_fresh_highlights', JSON.stringify(filteredHls));
+      }
+
+      // Remove any legacy mock keys
+      const legacyKeys = ['little_days_memories', 'little_days_stories', 'little_days_highlights', 'little_days_profile', 'insta_memories', 'insta_stories'];
+      legacyKeys.forEach(k => localStorage.removeItem(k));
+    } catch {
+      // ignore
+    }
   }
 };
+
+// Automatically run on load to purge any stale mock account
+authService.purgeAutoCreatedAccount();

@@ -58,6 +58,19 @@ export const App: React.FC = () => {
     }
   }, [isDarkMode]);
 
+  // Purge any stale mock accounts on startup
+  useEffect(() => {
+    authService.purgeAutoCreatedAccount();
+    const verified = authService.getCurrentUser();
+    if (!verified && currentUser) {
+      setCurrentUser(null);
+      setMemories([]);
+      setStories([]);
+      setHighlights([]);
+      setJournals([]);
+    }
+  }, []);
+
   // Auth Handlers
   const handleLoginSuccess = (user: UserAccount) => {
     setCurrentUser(user);
