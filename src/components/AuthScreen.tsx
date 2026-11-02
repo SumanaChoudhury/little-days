@@ -517,23 +517,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess }) => {
       )}
 
       {/* Footer */}
-      <footer className="text-center text-[11px] text-neutral-400 space-y-2 mt-8">
-        <div className="flex flex-wrap justify-center gap-x-3 gap-y-1">
-          <span>Meta</span>
-          <span>About</span>
-          <span>Blog</span>
-          <span>Jobs</span>
-          <span>Help</span>
-          <span>API</span>
-          <span>Privacy</span>
-          <span>Terms</span>
-          <span>Locations</span>
-          <span>MyMemories Web</span>
-          <span>Threads</span>
-        </div>
-        <p className="text-[10px] uppercase font-medium">
-          © 2026 MYMEMORIES • YOUR PRIVATE MEMORY ARCHIVE
-        </p>
+      <footer className="text-center text-xs font-medium text-neutral-400 mt-8 tracking-wide">
+        MADE BY SUMI
       </footer>
     </div>
   );

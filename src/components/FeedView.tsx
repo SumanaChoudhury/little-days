@@ -165,14 +165,9 @@ export const FeedView: React.FC<FeedViewProps> = ({
           </p>
         </div>
 
-        {/* Footer Meta Links */}
-        <div className="text-[11px] text-neutral-400 space-y-3 pt-2">
-          <p className="space-x-1 leading-relaxed">
-            <span>About</span> • <span>Help</span> • <span>Press</span> • <span>API</span> • <span>Jobs</span> • <span>Privacy</span> • <span>Terms</span> • <span>Locations</span> • <span>Language</span>
-          </p>
-          <p className="text-[10px] text-neutral-400 uppercase tracking-wider font-semibold">
-            © 2026 MYMEMORIES • YOUR PRIVATE MEMORY ARCHIVE
-          </p>
+        {/* Footer */}
+        <div className="text-xs font-medium text-neutral-400 pt-3 text-center sm:text-left tracking-wide">
+          MADE BY SUMI
         </div>
       </div>
     </div>
