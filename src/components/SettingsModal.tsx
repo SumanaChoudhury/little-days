@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { X, Shield, Download, Trash2, LogOut, Key, User, HardDrive, AlertTriangle } from 'lucide-react';
-import { UserAccount, authService } from '../lib/auth';
+import { X, Shield, Download, Trash2, LogOut, Key, User, HardDrive, AlertTriangle, Database, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
+import { UserAccount } from '../lib/auth';
 import { memoryStorage } from '../lib/storage';
+import { supabaseConfig, saveLocalSupabaseConfig } from '../lib/supabase';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -22,6 +23,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [deleteInput, setDeleteInput] = useState('');
   const [isExporting, setIsExporting] = useState(false);
 
+  // Cloud DB Config Form
+  const [showDbConfig, setShowDbConfig] = useState(false);
+  const [dbUrl, setDbUrl] = useState(supabaseConfig.url || '');
+  const [dbKey, setDbKey] = useState(supabaseConfig.anonKey || '');
+  const [dbSaved, setDbSaved] = useState(false);
+
   if (!isOpen) return null;
 
   const handleExportAll = async () => {
@@ -36,6 +43,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     } finally {
       setIsExporting(false);
     }
+  };
+
+  const handleSaveDb = (e: React.FormEvent) => {
+    e.preventDefault();
+    saveLocalSupabaseConfig(dbUrl.trim(), dbKey.trim());
+    setDbSaved(true);
+    setTimeout(() => setDbSaved(false), 3000);
   };
 
   const handleConfirmDelete = () => {
@@ -71,27 +85,105 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 {currentUser.username}
               </span>
               <span className="text-neutral-500 block">{currentUser.email}</span>
-              <span className="text-[10px] text-emerald-500 font-semibold">
-                ● Private Memory Account
+              <span className="text-[10px] text-emerald-500 font-semibold flex items-center gap-1 mt-0.5">
+                <Shield className="w-3 h-3" /> Private Memory Account (No Followers)
               </span>
+            </div>
+          </div>
+
+          {/* Online Safe Database (Supabase) */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">
+                Online Safe Database
+              </span>
+              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                supabaseConfig.isConfigured 
+                  ? 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400' 
+                  : 'bg-amber-100 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400'
+              }`}>
+                {supabaseConfig.isConfigured ? '● Cloud Connected' : '● Local Encrypted Vault'}
+              </span>
+            </div>
+            
+            <div className="p-3.5 rounded-xl border border-neutral-200 dark:border-neutral-800 space-y-2.5 bg-neutral-50/50 dark:bg-neutral-900/40">
+              <div className="flex items-start gap-2.5">
+                <Database className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="font-bold text-xs text-black dark:text-white">
+                    PostgreSQL with Row Level Security (RLS)
+                  </h4>
+                  <p className="text-[11px] text-neutral-500 mt-1 leading-normal">
+                    Database keys are protected via Render Environment Variables and client-side encryption. Keys are never committed or exposed on GitHub.
+                  </p>
+                </div>
+              </div>
+
+              {/* Toggle manual key entry */}
+              <button
+                type="button"
+                onClick={() => setShowDbConfig(!showDbConfig)}
+                className="w-full flex items-center justify-between pt-2 border-t border-neutral-200 dark:border-neutral-800 text-[11px] font-medium text-sky-500 hover:text-sky-600 transition-colors"
+              >
+                <span>{showDbConfig ? 'Hide Cloud Key Settings' : 'Connect Custom Supabase Credentials'}</span>
+                {showDbConfig ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              </button>
+
+              {showDbConfig && (
+                <form onSubmit={handleSaveDb} className="pt-2 space-y-2 animate-fade-in">
+                  <div>
+                    <label className="text-[10px] text-neutral-500 uppercase font-semibold block mb-1">
+                      Project URL (e.g., https://xyz.supabase.co)
+                    </label>
+                    <input
+                      type="url"
+                      value={dbUrl}
+                      onChange={e => setDbUrl(e.target.value)}
+                      placeholder="https://your-project.supabase.co"
+                      className="w-full p-2 rounded-lg bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-xs text-black dark:text-white outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-neutral-500 uppercase font-semibold block mb-1">
+                      Anon Public Key
+                    </label>
+                    <input
+                      type="password"
+                      value={dbKey}
+                      onChange={e => setDbKey(e.target.value)}
+                      placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpX..."
+                      className="w-full p-2 rounded-lg bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-xs text-black dark:text-white outline-none font-mono"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-[10px] text-neutral-400">Saved only in your private browser</span>
+                    <button
+                      type="submit"
+                      className="px-3 py-1.5 rounded-lg bg-sky-500 text-white font-semibold text-xs hover:bg-sky-600 transition-colors"
+                    >
+                      {dbSaved ? 'Saved!' : 'Save Credentials'}
+                    </button>
+                  </div>
+                </form>
+              )}
             </div>
           </div>
 
           {/* Privacy & Cloud Storage */}
           <div className="space-y-2">
             <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">
-              Data & Storage
+              Media & Storage Vault
             </span>
-            <div className="p-3 rounded-xl border border-neutral-200 dark:border-neutral-800 space-y-2">
+            <div className="p-3.5 rounded-xl border border-neutral-200 dark:border-neutral-800 space-y-2">
               <div className="flex items-center justify-between">
                 <span className="flex items-center gap-2 font-medium">
                   <HardDrive className="w-4 h-4 text-sky-500" />
-                  <span>Smart 90-Day Archive</span>
+                  <span>Smart 90-Day Cold Vault</span>
                 </span>
                 <span className="text-emerald-500 font-semibold">Active</span>
               </div>
               <p className="text-[11px] text-neutral-500 leading-normal">
-                Memories older than 90 days are automatically archived into monthly ZIP packages while remaining visible in your feed.
+                Media older than 90 days automatically packages into monthly ZIP bundles with sha256 checksums, freeing active browser storage.
               </p>
 
               {/* Download Backup */}
