@@ -208,7 +208,6 @@ export const App: React.FC = () => {
         id: `post-${Date.now()}`,
         caption: 'Live snapshot 📸',
         date: new Date().toISOString().split('T')[0],
-        mood: '✨ peaceful',
         media: [
           {
             id: `media-cam-${Date.now()}`,

@@ -25,7 +25,6 @@ export const CreateModal: React.FC<CreateModalProps> = ({
   const [caption, setCaption] = useState('');
   const [location, setLocation] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [mood, setMood] = useState('✨ peaceful');
   const [isStory, setIsStory] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -91,7 +90,6 @@ export const CreateModal: React.FC<CreateModalProps> = ({
         caption: caption.trim(),
         date: date || new Date().toISOString().split('T')[0],
         location: location.trim() || undefined,
-        mood,
         media: selectedMedia,
         isLiked: false,
         isBookmarked: false,
@@ -284,27 +282,6 @@ export const CreateModal: React.FC<CreateModalProps> = ({
                   onChange={e => setLocation(e.target.value)}
                   className="w-full bg-transparent text-xs text-black dark:text-white placeholder-neutral-400 outline-none"
                 />
-              </div>
-
-              <div>
-                <span className="text-[11px] font-medium text-neutral-400 block mb-1.5">
-                  Mood tag:
-                </span>
-                <div className="flex flex-wrap gap-1">
-                  {['🌸 joyful', '☕ cozy', '✨ peaceful', '⚡ chaotic', '🌊 nostalgic', '💖 grateful'].map((m, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => setMood(m)}
-                      className={`text-[11px] px-2 py-0.5 rounded-full ${
-                        mood === m
-                          ? 'bg-sky-500 text-white font-semibold'
-                          : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300'
-                      }`}
-                    >
-                      {m}
-                    </button>
-                  ))}
-                </div>
               </div>
             </div>
 
