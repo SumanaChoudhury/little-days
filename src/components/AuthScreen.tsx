@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { Eye, EyeOff, Check, X, Shield, Mail } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Eye, EyeOff, Check, X, Shield, Mail, KeyRound, ArrowLeft, RefreshCw } from 'lucide-react';
 import { InstagramLogo } from './InstagramIcons';
-import { authService, UserAccount, validatePasswordFormat } from '../lib/auth';
+import { authService, UserAccount, validatePasswordFormat, validateEmailFormat } from '../lib/auth';
 
 interface AuthScreenProps {
   onLoginSuccess: (user: UserAccount) => void;
@@ -23,6 +23,13 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  // OTP Verification State
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [activeCode, setActiveCode] = useState('');
+  const [otpError, setOtpError] = useState('');
+  const [resendCooldown, setResendCooldown] = useState(0);
+
   // Google Sign-In Modal State
   const [isGoogleModalOpen, setIsGoogleModalOpen] = useState(false);
   const [googleEmail, setGoogleEmail] = useState('');
@@ -32,8 +39,17 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess }) => {
   // General Error message
   const [errorMsg, setErrorMsg] = useState('');
 
-  // Live password validation
+  // Live validations
   const passwordValidation = validatePasswordFormat(password);
+  const emailValidation = email ? validateEmailFormat(email) : { isValid: true };
+
+  // Countdown timer for resending OTP
+  useEffect(() => {
+    if (resendCooldown > 0) {
+      const timer = setTimeout(() => setResendCooldown(resendCooldown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [resendCooldown]);
 
   const getStrengthLabel = (score: number) => {
     switch (score) {
@@ -54,37 +70,92 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess }) => {
 
   const strength = getStrengthLabel(passwordValidation.score);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleStartSignUp = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
 
+    if (!email.trim() || !fullName.trim() || !username.trim() || !password.trim()) {
+      setErrorMsg('Please complete all required fields to sign up.');
+      return;
+    }
+
+    // Strict Email Format Check
+    const emailCheck = validateEmailFormat(email);
+    if (!emailCheck.isValid) {
+      setErrorMsg(emailCheck.error || 'Please enter a valid email address.');
+      return;
+    }
+
+    // Check if user already exists
+    const users = authService.getAllUsers();
+    if (users.some(u => u.email.toLowerCase() === email.trim().toLowerCase() || u.username.toLowerCase() === username.trim().toLowerCase())) {
+      setErrorMsg('An account with this email or username already exists. Please log in.');
+      return;
+    }
+
+    // Password format check
+    if (!passwordValidation.isValid) {
+      setErrorMsg(`Password must meet all format requirements.`);
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setErrorMsg('Passwords do not match. Please verify.');
+      return;
+    }
+
+    // Generate 6-digit confirmation code and show verification step
+    const code = authService.generateVerificationCode(email);
+    setActiveCode(code);
+    setIsVerifyingOtp(true);
+    setResendCooldown(30);
+    setOtpCode('');
+    setOtpError('');
+  };
+
+  const handleVerifyOtp = (e: React.FormEvent) => {
+    e.preventDefault();
+    setOtpError('');
+
+    if (!otpCode.trim() || otpCode.trim().length !== 6) {
+      setOtpError('Please enter the full 6-digit confirmation code.');
+      return;
+    }
+
+    const isValid = authService.verifyCode(email, otpCode);
+    if (!isValid && otpCode.trim() !== activeCode) {
+      setOtpError("That code isn't right. Check your code and try again.");
+      return;
+    }
+
     try {
-      if (isSignUp) {
-        if (!email.trim() || !fullName.trim() || !username.trim() || !password.trim()) {
-          setErrorMsg('Please complete all required fields to sign up.');
-          return;
-        }
+      const user = authService.signup(email, fullName, username, password);
+      onLoginSuccess(user);
+    } catch (err: any) {
+      setOtpError(err.message || 'Failed to complete registration.');
+    }
+  };
 
-        if (!passwordValidation.isValid) {
-          setErrorMsg(`Password does not meet required format: ${passwordValidation.errors.join(', ')}`);
-          return;
-        }
+  const handleResendCode = () => {
+    if (resendCooldown > 0) return;
+    const newCode = authService.generateVerificationCode(email);
+    setActiveCode(newCode);
+    setResendCooldown(30);
+    setOtpError('');
+  };
 
-        if (password !== confirmPassword) {
-          setErrorMsg('Passwords do not match. Please verify.');
-          return;
-        }
+  const handleLoginSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg('');
 
-        const user = authService.signup(email, fullName, username, password);
-        onLoginSuccess(user);
-      } else {
-        if (!emailOrUsername.trim() || !password.trim()) {
-          setErrorMsg('Please enter your username/email and password.');
-          return;
-        }
-        const user = authService.login(emailOrUsername, password);
-        onLoginSuccess(user);
-      }
+    if (!emailOrUsername.trim() || !password.trim()) {
+      setErrorMsg('Please enter your username/email and password.');
+      return;
+    }
+
+    try {
+      const user = authService.login(emailOrUsername, password);
+      onLoginSuccess(user);
     } catch (err: any) {
       setErrorMsg(err.message || 'Authentication error.');
     }
@@ -96,6 +167,12 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess }) => {
 
     if (!googleEmail.trim()) {
       setGoogleError('Please enter your Google Mail address.');
+      return;
+    }
+
+    const emailCheck = validateEmailFormat(googleEmail);
+    if (!emailCheck.isValid) {
+      setGoogleError(emailCheck.error || 'Please enter a valid Google Mail address.');
       return;
     }
 
@@ -145,278 +222,396 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess }) => {
                 <InstagramLogo width={190} height={48} />
               </div>
 
-              <p className="text-xs text-neutral-500 font-medium text-center mb-5 leading-normal">
-                {isSignUp
-                  ? 'Sign up to build your private MyMemories vault.'
-                  : 'Log in to your private MyMemories archive.'}
-              </p>
+              {/* STEP 2: Email OTP Verification Screen */}
+              {isVerifyingOtp ? (
+                <div className="w-full space-y-4 animate-fade-in text-center">
+                  <div className="w-12 h-12 rounded-full border-2 border-neutral-300 dark:border-neutral-700 flex items-center justify-center mx-auto text-sky-500">
+                    <Mail className="w-6 h-6 stroke-[1.8]" />
+                  </div>
 
-              {/* Continue with Google Mail Button */}
-              <button
-                type="button"
-                onClick={() => setIsGoogleModalOpen(true)}
-                className="w-full py-2.5 px-3 rounded-lg border border-[#dbdbdb] dark:border-[#363636] bg-white dark:bg-[#121212] hover:bg-neutral-50 dark:hover:bg-neutral-800 text-xs font-semibold text-neutral-800 dark:text-neutral-200 flex items-center justify-center gap-2.5 transition-all shadow-2xs hover:shadow-xs active:scale-[0.99]"
-              >
-                {/* Official Google G Logo */}
-                <svg viewBox="0 0 24 24" className="w-4 h-4 shrink-0">
-                  <path
-                    fill="#4285F4"
-                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                  />
-                  <path
-                    fill="#34A853"
-                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                  />
-                  <path
-                    fill="#FBBC05"
-                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                  />
-                  <path
-                    fill="#EA4335"
-                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                  />
-                </svg>
-                <span>Continue with Google Mail</span>
-              </button>
+                  <div>
+                    <h3 className="text-sm font-bold text-black dark:text-white">
+                      Enter Confirmation Code
+                    </h3>
+                    <p className="text-xs text-neutral-500 mt-1 leading-normal">
+                      To finish signing up, enter the 6-digit confirmation code sent to <strong className="text-black dark:text-white font-medium">{email}</strong>.
+                    </p>
+                  </div>
 
-              {/* Instagram Standard "OR" Divider */}
-              <div className="flex items-center my-4 w-full">
-                <div className="flex-1 h-[1px] bg-[#dbdbdb] dark:bg-[#262626]" />
-                <span className="px-4 text-[10px] font-bold text-neutral-400 uppercase tracking-widest">
-                  OR
-                </span>
-                <div className="flex-1 h-[1px] bg-[#dbdbdb] dark:bg-[#262626]" />
-              </div>
+                  {/* Simulated Secure Inbox Delivery Banner */}
+                  <div className="p-2.5 rounded-lg bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-900 text-left space-y-1">
+                    <div className="flex items-center justify-between text-[11px] font-semibold text-sky-700 dark:text-sky-300">
+                      <span>📩 Simulated Inbox Notification</span>
+                      <span className="font-mono text-xs bg-sky-100 dark:bg-sky-900 px-1.5 py-0.5 rounded font-bold">
+                        {activeCode}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-sky-600 dark:text-sky-400">
+                      Code generated securely for <span className="font-mono">{email}</span>.
+                    </p>
+                  </div>
 
-              {/* Form */}
-              <form onSubmit={handleSubmit} className="w-full space-y-2 text-xs">
-                {isSignUp ? (
-                  <>
-                    <input
-                      type="email"
-                      placeholder="Email address"
-                      value={email}
-                      onChange={e => setEmail(e.target.value)}
-                      className="w-full p-2.5 rounded-sm bg-[#fafafa] dark:bg-[#121212] border border-[#dbdbdb] dark:border-[#363636] text-black dark:text-white placeholder-neutral-400 outline-none focus:border-neutral-500"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Full Name"
-                      value={fullName}
-                      onChange={e => setFullName(e.target.value)}
-                      className="w-full p-2.5 rounded-sm bg-[#fafafa] dark:bg-[#121212] border border-[#dbdbdb] dark:border-[#363636] text-black dark:text-white placeholder-neutral-400 outline-none focus:border-neutral-500"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Username"
-                      value={username}
-                      onChange={e => setUsername(e.target.value)}
-                      className="w-full p-2.5 rounded-sm bg-[#fafafa] dark:bg-[#121212] border border-[#dbdbdb] dark:border-[#363636] text-black dark:text-white placeholder-neutral-400 outline-none focus:border-neutral-500"
-                    />
-
-                    {/* Password Input with Eye */}
-                    <div className="relative w-full">
+                  <form onSubmit={handleVerifyOtp} className="space-y-3">
+                    <div>
                       <input
-                        type={showPassword ? 'text' : 'password'}
-                        placeholder="Password"
-                        value={password}
-                        onChange={e => setPassword(e.target.value)}
-                        className="w-full p-2.5 pr-9 rounded-sm bg-[#fafafa] dark:bg-[#121212] border border-[#dbdbdb] dark:border-[#363636] text-black dark:text-white placeholder-neutral-400 outline-none focus:border-neutral-500 font-sans"
+                        type="text"
+                        maxLength={6}
+                        value={otpCode}
+                        onChange={e => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                        placeholder="••••••"
+                        autoFocus
+                        className="w-full py-2.5 px-3 rounded-lg bg-[#fafafa] dark:bg-[#121212] border border-[#dbdbdb] dark:border-[#363636] text-center text-lg font-mono tracking-widest text-black dark:text-white outline-none focus:border-[#0095f6]"
                       />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        aria-label={showPassword ? 'Hide password' : 'Show password'}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-black dark:hover:text-white p-0.5 transition-colors"
-                      >
-                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
                     </div>
 
-                    {/* Live Password Format Validation Card */}
-                    {password.length > 0 && (
-                      <div className="p-2.5 rounded-lg bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 space-y-2 animate-fade-in text-[11px]">
-                        {/* Strength Indicator Bar */}
-                        <div className="space-y-1">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[10px] text-neutral-400 uppercase font-semibold">
-                              Password Strength
-                            </span>
-                            <span className={`text-[10px] font-bold ${strength.text}`}>
-                              {strength.label}
-                            </span>
-                          </div>
-                          <div className="w-full h-1.5 bg-neutral-200 dark:bg-neutral-800 rounded-full overflow-hidden flex">
-                            <div
-                              className={`h-full transition-all duration-300 ${strength.color}`}
-                              style={{ width: `${(passwordValidation.score / 5) * 100}%` }}
-                            />
-                          </div>
-                        </div>
-
-                        {/* Checklist */}
-                        <div className="space-y-1 pt-1">
-                          <div className="flex items-center gap-1.5 text-[10.5px]">
-                            {passwordValidation.hasMinLength ? (
-                              <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                            ) : (
-                              <div className="w-3.5 h-3.5 rounded-full border border-neutral-300 dark:border-neutral-700 flex items-center justify-center shrink-0" />
-                            )}
-                            <span className={passwordValidation.hasMinLength ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-neutral-400'}>
-                              At least 8 characters
-                            </span>
-                          </div>
-
-                          <div className="flex items-center gap-1.5 text-[10.5px]">
-                            {passwordValidation.hasUppercase ? (
-                              <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                            ) : (
-                              <div className="w-3.5 h-3.5 rounded-full border border-neutral-300 dark:border-neutral-700 flex items-center justify-center shrink-0" />
-                            )}
-                            <span className={passwordValidation.hasUppercase ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-neutral-400'}>
-                              One uppercase letter (A-Z)
-                            </span>
-                          </div>
-
-                          <div className="flex items-center gap-1.5 text-[10.5px]">
-                            {passwordValidation.hasLowercase ? (
-                              <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                            ) : (
-                              <div className="w-3.5 h-3.5 rounded-full border border-neutral-300 dark:border-neutral-700 flex items-center justify-center shrink-0" />
-                            )}
-                            <span className={passwordValidation.hasLowercase ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-neutral-400'}>
-                              One lowercase letter (a-z)
-                            </span>
-                          </div>
-
-                          <div className="flex items-center gap-1.5 text-[10.5px]">
-                            {passwordValidation.hasNumber ? (
-                              <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                            ) : (
-                              <div className="w-3.5 h-3.5 rounded-full border border-neutral-300 dark:border-neutral-700 flex items-center justify-center shrink-0" />
-                            )}
-                            <span className={passwordValidation.hasNumber ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-neutral-400'}>
-                              One number (0-9)
-                            </span>
-                          </div>
-
-                          <div className="flex items-center gap-1.5 text-[10.5px]">
-                            {passwordValidation.hasSpecial ? (
-                              <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                            ) : (
-                              <div className="w-3.5 h-3.5 rounded-full border border-neutral-300 dark:border-neutral-700 flex items-center justify-center shrink-0" />
-                            )}
-                            <span className={passwordValidation.hasSpecial ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-neutral-400'}>
-                              One special character (!@#$%^&*...)
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Confirm Password Input with Eye */}
-                    <div className="relative w-full">
-                      <input
-                        type={showConfirmPassword ? 'text' : 'password'}
-                        placeholder="Confirm Password"
-                        value={confirmPassword}
-                        onChange={e => setConfirmPassword(e.target.value)}
-                        className="w-full p-2.5 pr-9 rounded-sm bg-[#fafafa] dark:bg-[#121212] border border-[#dbdbdb] dark:border-[#363636] text-black dark:text-white placeholder-neutral-400 outline-none focus:border-neutral-500 font-sans"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                        aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-black dark:hover:text-white p-0.5 transition-colors"
-                      >
-                        {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-
-                    {confirmPassword.length > 0 && (
-                      <p className={`text-[10.5px] px-1 ${
-                        password === confirmPassword ? 'text-emerald-500' : 'text-rose-500'
-                      }`}>
-                        {password === confirmPassword ? '✓ Passwords match' : '✕ Passwords do not match'}
+                    {otpError && (
+                      <p className="text-rose-500 text-[11px] text-center font-medium">
+                        {otpError}
                       </p>
                     )}
-                  </>
-                ) : (
-                  <>
-                    <input
-                      type="text"
-                      placeholder="Username or email"
-                      value={emailOrUsername}
-                      onChange={e => setEmailOrUsername(e.target.value)}
-                      className="w-full p-2.5 rounded-sm bg-[#fafafa] dark:bg-[#121212] border border-[#dbdbdb] dark:border-[#363636] text-black dark:text-white placeholder-neutral-400 outline-none focus:border-neutral-500"
-                    />
 
-                    {/* Password Input with Eye */}
-                    <div className="relative w-full">
-                      <input
-                        type={showPassword ? 'text' : 'password'}
-                        placeholder="Password"
-                        value={password}
-                        onChange={e => setPassword(e.target.value)}
-                        className="w-full p-2.5 pr-9 rounded-sm bg-[#fafafa] dark:bg-[#121212] border border-[#dbdbdb] dark:border-[#363636] text-black dark:text-white placeholder-neutral-400 outline-none focus:border-neutral-500 font-sans"
-                      />
+                    <button
+                      type="submit"
+                      disabled={otpCode.length !== 6}
+                      className="w-full py-2.5 rounded-lg bg-[#0095f6] hover:bg-[#1877f2] font-semibold text-white text-xs disabled:opacity-40 transition-colors shadow-xs"
+                    >
+                      Confirm & Create Account
+                    </button>
+
+                    <div className="flex items-center justify-between pt-1 text-[11px]">
                       <button
                         type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        aria-label={showPassword ? 'Hide password' : 'Show password'}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-black dark:hover:text-white p-0.5 transition-colors"
+                        onClick={handleResendCode}
+                        disabled={resendCooldown > 0}
+                        className="text-[#0095f6] font-semibold disabled:text-neutral-400 hover:underline"
                       >
-                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        {resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : 'Resend Code'}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setIsVerifyingOtp(false)}
+                        className="text-neutral-500 hover:text-black dark:hover:text-white"
+                      >
+                        Change Email
                       </button>
                     </div>
-                  </>
-                )}
+                  </form>
+                </div>
+              ) : (
+                /* STEP 1: Main Form (Log in or Sign Up) */
+                <>
+                  <p className="text-xs text-neutral-500 font-medium text-center mb-5 leading-normal">
+                    {isSignUp
+                      ? 'Sign up to build your private MyMemories vault.'
+                      : 'Log in to your private MyMemories archive.'}
+                  </p>
 
-                {errorMsg && (
-                  <div className="p-2 rounded bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-600 dark:text-rose-400 text-[11px] text-center">
-                    {errorMsg}
+                  {/* Continue with Google Mail Button */}
+                  <button
+                    type="button"
+                    onClick={() => setIsGoogleModalOpen(true)}
+                    className="w-full py-2.5 px-3 rounded-lg border border-[#dbdbdb] dark:border-[#363636] bg-white dark:bg-[#121212] hover:bg-neutral-50 dark:hover:bg-neutral-800 text-xs font-semibold text-neutral-800 dark:text-neutral-200 flex items-center justify-center gap-2.5 transition-all shadow-2xs hover:shadow-xs active:scale-[0.99]"
+                  >
+                    {/* Official Google G Logo */}
+                    <svg viewBox="0 0 24 24" className="w-4 h-4 shrink-0">
+                      <path
+                        fill="#4285F4"
+                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                      />
+                      <path
+                        fill="#34A853"
+                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                      />
+                      <path
+                        fill="#FBBC05"
+                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                      />
+                      <path
+                        fill="#EA4335"
+                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                      />
+                    </svg>
+                    <span>Continue with Google Mail</span>
+                  </button>
+
+                  {/* Standard "OR" Divider */}
+                  <div className="flex items-center my-4 w-full">
+                    <div className="flex-1 h-[1px] bg-[#dbdbdb] dark:bg-[#262626]" />
+                    <span className="px-4 text-[10px] font-bold text-neutral-400 uppercase tracking-widest">
+                      OR
+                    </span>
+                    <div className="flex-1 h-[1px] bg-[#dbdbdb] dark:bg-[#262626]" />
                   </div>
-                )}
 
-                <button
-                  type="submit"
-                  className="w-full py-2.5 mt-2 rounded-lg bg-[#0095f6] hover:bg-[#1877f2] active:scale-[0.99] font-semibold text-white transition-all shadow-xs"
-                >
-                  {isSignUp ? 'Sign up' : 'Log in'}
-                </button>
-              </form>
+                  {/* Sign Up Form */}
+                  {isSignUp ? (
+                    <form onSubmit={handleStartSignUp} className="w-full space-y-2 text-xs">
+                      <div>
+                        <input
+                          type="email"
+                          placeholder="Email address (e.g. name@gmail.com)"
+                          value={email}
+                          onChange={e => setEmail(e.target.value)}
+                          className={`w-full p-2.5 rounded-sm bg-[#fafafa] dark:bg-[#121212] border text-black dark:text-white placeholder-neutral-400 outline-none focus:border-neutral-500 ${
+                            email && !emailValidation.isValid
+                              ? 'border-rose-400'
+                              : 'border-[#dbdbdb] dark:border-[#363636]'
+                          }`}
+                        />
+                        {/* Live Email Feedback / Typo Suggestion */}
+                        {email && !emailValidation.isValid && (
+                          <div className="pt-1 text-[10.5px] text-rose-500 flex items-start justify-between">
+                            <span>{emailValidation.error}</span>
+                            {emailValidation.suggestion && (
+                              <button
+                                type="button"
+                                onClick={() => setEmail(emailValidation.suggestion!)}
+                                className="text-sky-500 font-semibold underline ml-1"
+                              >
+                                Fix
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      <input
+                        type="text"
+                        placeholder="Full Name"
+                        value={fullName}
+                        onChange={e => setFullName(e.target.value)}
+                        className="w-full p-2.5 rounded-sm bg-[#fafafa] dark:bg-[#121212] border border-[#dbdbdb] dark:border-[#363636] text-black dark:text-white placeholder-neutral-400 outline-none focus:border-neutral-500"
+                      />
+
+                      <input
+                        type="text"
+                        placeholder="Username"
+                        value={username}
+                        onChange={e => setUsername(e.target.value)}
+                        className="w-full p-2.5 rounded-sm bg-[#fafafa] dark:bg-[#121212] border border-[#dbdbdb] dark:border-[#363636] text-black dark:text-white placeholder-neutral-400 outline-none focus:border-neutral-500"
+                      />
+
+                      {/* Password Input with Eye */}
+                      <div className="relative w-full">
+                        <input
+                          type={showPassword ? 'text' : 'password'}
+                          placeholder="Password"
+                          value={password}
+                          onChange={e => setPassword(e.target.value)}
+                          className="w-full p-2.5 pr-9 rounded-sm bg-[#fafafa] dark:bg-[#121212] border border-[#dbdbdb] dark:border-[#363636] text-black dark:text-white placeholder-neutral-400 outline-none focus:border-neutral-500 font-sans"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          aria-label={showPassword ? 'Hide password' : 'Show password'}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-black dark:hover:text-white p-0.5 transition-colors"
+                        >
+                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+
+                      {/* Live Password Format Validation Card */}
+                      {password.length > 0 && (
+                        <div className="p-2.5 rounded-lg bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 space-y-2 animate-fade-in text-[11px]">
+                          {/* Strength Indicator Bar */}
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] text-neutral-400 uppercase font-semibold">
+                                Password Strength
+                              </span>
+                              <span className={`text-[10px] font-bold ${strength.text}`}>
+                                {strength.label}
+                              </span>
+                            </div>
+                            <div className="w-full h-1.5 bg-neutral-200 dark:bg-neutral-800 rounded-full overflow-hidden flex">
+                              <div
+                                className={`h-full transition-all duration-300 ${strength.color}`}
+                                style={{ width: `${(passwordValidation.score / 5) * 100}%` }}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Checklist */}
+                          <div className="space-y-1 pt-1">
+                            <div className="flex items-center gap-1.5 text-[10.5px]">
+                              {passwordValidation.hasMinLength ? (
+                                <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                              ) : (
+                                <div className="w-3.5 h-3.5 rounded-full border border-neutral-300 dark:border-neutral-700 flex items-center justify-center shrink-0" />
+                              )}
+                              <span className={passwordValidation.hasMinLength ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-neutral-400'}>
+                                At least 8 characters
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 text-[10.5px]">
+                              {passwordValidation.hasUppercase ? (
+                                <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                              ) : (
+                                <div className="w-3.5 h-3.5 rounded-full border border-neutral-300 dark:border-neutral-700 flex items-center justify-center shrink-0" />
+                              )}
+                              <span className={passwordValidation.hasUppercase ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-neutral-400'}>
+                                One uppercase letter (A-Z)
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 text-[10.5px]">
+                              {passwordValidation.hasLowercase ? (
+                                <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                              ) : (
+                                <div className="w-3.5 h-3.5 rounded-full border border-neutral-300 dark:border-neutral-700 flex items-center justify-center shrink-0" />
+                              )}
+                              <span className={passwordValidation.hasLowercase ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-neutral-400'}>
+                                One lowercase letter (a-z)
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 text-[10.5px]">
+                              {passwordValidation.hasNumber ? (
+                                <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                              ) : (
+                                <div className="w-3.5 h-3.5 rounded-full border border-neutral-300 dark:border-neutral-700 flex items-center justify-center shrink-0" />
+                              )}
+                              <span className={passwordValidation.hasNumber ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-neutral-400'}>
+                                One number (0-9)
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 text-[10.5px]">
+                              {passwordValidation.hasSpecial ? (
+                                <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                              ) : (
+                                <div className="w-3.5 h-3.5 rounded-full border border-neutral-300 dark:border-neutral-700 flex items-center justify-center shrink-0" />
+                              )}
+                              <span className={passwordValidation.hasSpecial ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-neutral-400'}>
+                                One special character (!@#$%^&*...)
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Confirm Password Input with Eye */}
+                      <div className="relative w-full">
+                        <input
+                          type={showConfirmPassword ? 'text' : 'password'}
+                          placeholder="Confirm Password"
+                          value={confirmPassword}
+                          onChange={e => setConfirmPassword(e.target.value)}
+                          className="w-full p-2.5 pr-9 rounded-sm bg-[#fafafa] dark:bg-[#121212] border border-[#dbdbdb] dark:border-[#363636] text-black dark:text-white placeholder-neutral-400 outline-none focus:border-neutral-500 font-sans"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-black dark:hover:text-white p-0.5 transition-colors"
+                        >
+                          {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+
+                      {confirmPassword.length > 0 && (
+                        <p className={`text-[10.5px] px-1 ${
+                          password === confirmPassword ? 'text-emerald-500' : 'text-rose-500'
+                        }`}>
+                          {password === confirmPassword ? '✓ Passwords match' : '✕ Passwords do not match'}
+                        </p>
+                      )}
+
+                      {errorMsg && (
+                        <div className="p-2 rounded bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-600 dark:text-rose-400 text-[11px] text-center">
+                          {errorMsg}
+                        </div>
+                      )}
+
+                      <button
+                        type="submit"
+                        className="w-full py-2.5 mt-2 rounded-lg bg-[#0095f6] hover:bg-[#1877f2] active:scale-[0.99] font-semibold text-white transition-all shadow-xs"
+                      >
+                        Sign up
+                      </button>
+                    </form>
+                  ) : (
+                    /* Log In Form */
+                    <form onSubmit={handleLoginSubmit} className="w-full space-y-2 text-xs">
+                      <input
+                        type="text"
+                        placeholder="Username or email"
+                        value={emailOrUsername}
+                        onChange={e => setEmailOrUsername(e.target.value)}
+                        className="w-full p-2.5 rounded-sm bg-[#fafafa] dark:bg-[#121212] border border-[#dbdbdb] dark:border-[#363636] text-black dark:text-white placeholder-neutral-400 outline-none focus:border-neutral-500"
+                      />
+
+                      {/* Password Input with Eye */}
+                      <div className="relative w-full">
+                        <input
+                          type={showPassword ? 'text' : 'password'}
+                          placeholder="Password"
+                          value={password}
+                          onChange={e => setPassword(e.target.value)}
+                          className="w-full p-2.5 pr-9 rounded-sm bg-[#fafafa] dark:bg-[#121212] border border-[#dbdbdb] dark:border-[#363636] text-black dark:text-white placeholder-neutral-400 outline-none focus:border-neutral-500 font-sans"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          aria-label={showPassword ? 'Hide password' : 'Show password'}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-black dark:hover:text-white p-0.5 transition-colors"
+                        >
+                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+
+                      {errorMsg && (
+                        <div className="p-2 rounded bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-600 dark:text-rose-400 text-[11px] text-center">
+                          {errorMsg}
+                        </div>
+                      )}
+
+                      <button
+                        type="submit"
+                        className="w-full py-2.5 mt-2 rounded-lg bg-[#0095f6] hover:bg-[#1877f2] active:scale-[0.99] font-semibold text-white transition-all shadow-xs"
+                      >
+                        Log in
+                      </button>
+                    </form>
+                  )}
+                </>
+              )}
             </div>
 
             {/* Toggle Sign Up / Log In */}
-            <div className="bg-white dark:bg-black border border-[#dbdbdb] dark:border-[#262626] p-5 text-center text-xs sm:rounded-sm">
-              {isSignUp ? (
-                <p>
-                  Have an account?{' '}
-                  <button
-                    onClick={() => {
-                      setIsSignUp(false);
-                      setErrorMsg('');
-                    }}
-                    className="font-semibold text-[#0095f6] hover:underline"
-                  >
-                    Log in
-                  </button>
-                </p>
-              ) : (
-                <p>
-                  Don't have an account?{' '}
-                  <button
-                    onClick={() => {
-                      setIsSignUp(true);
-                      setErrorMsg('');
-                    }}
-                    className="font-semibold text-[#0095f6] hover:underline"
-                  >
-                    Sign up
-                  </button>
-                </p>
-              )}
-            </div>
+            {!isVerifyingOtp && (
+              <div className="bg-white dark:bg-black border border-[#dbdbdb] dark:border-[#262626] p-5 text-center text-xs sm:rounded-sm">
+                {isSignUp ? (
+                  <p>
+                    Have an account?{' '}
+                    <button
+                      onClick={() => {
+                        setIsSignUp(false);
+                        setErrorMsg('');
+                      }}
+                      className="font-semibold text-[#0095f6] hover:underline"
+                    >
+                      Log in
+                    </button>
+                  </p>
+                ) : (
+                  <p>
+                    Don't have an account?{' '}
+                    <button
+                      onClick={() => {
+                        setIsSignUp(true);
+                        setErrorMsg('');
+                      }}
+                      className="font-semibold text-[#0095f6] hover:underline"
+                    >
+                      Sign up
+                    </button>
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -446,7 +641,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess }) => {
                   />
                 </svg>
                 <span className="font-bold text-sm text-black dark:text-white">
-                  Sign in with Google
+                  Sign in with Google Mail
                 </span>
               </div>
               <button
@@ -487,7 +682,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess }) => {
                   type="text"
                   value={googleName}
                   onChange={e => setGoogleName(e.target.value)}
-                  placeholder="Sumana Choudhury"
+                  placeholder="Sumana"
                   className="w-full p-2.5 rounded-lg bg-neutral-50 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 text-xs text-black dark:text-white outline-none focus:border-blue-500"
                 />
               </div>

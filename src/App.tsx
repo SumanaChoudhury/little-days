@@ -417,6 +417,7 @@ export const App: React.FC = () => {
         currentUser={currentUser}
         onLogout={handleLogout}
         onDeleteAccount={handleDeleteAccount}
+        onUpdateUser={updated => setCurrentUser(updated)}
       />
 
       <PostDetailModal

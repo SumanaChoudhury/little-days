@@ -5,6 +5,7 @@ export interface UserAccount extends UserProfile {
   email: string;
   password?: string;
   provider?: 'local' | 'google';
+  isEmailVerified?: boolean;
   createdAt: string;
 }
 
@@ -52,6 +53,86 @@ export function validatePasswordFormat(password: string): PasswordValidationResu
   };
 }
 
+const DISPOSABLE_DOMAINS = new Set([
+  'tempmail.com', 'mailinator.com', '10minutemail.com', 'guerrillamail.com',
+  'throwawaymail.com', 'yopmail.com', 'fakeinbox.com', 'sharklasers.com',
+  'trashmail.com', 'dispostable.com', 'temp-mail.org', 'tempail.com',
+  'burnermail.io', 'getairmail.com', 'mohmal.com'
+]);
+
+const DOMAIN_TYPOS: Record<string, string> = {
+  'gmial.com': 'gmail.com',
+  'gamil.com': 'gmail.com',
+  'gmai.com': 'gmail.com',
+  'gmaill.com': 'gmail.com',
+  'gmail.co': 'gmail.com',
+  'yaho.com': 'yahoo.com',
+  'yahooo.com': 'yahoo.com',
+  'hotmial.com': 'hotmail.com',
+  'hotmai.com': 'hotmail.com',
+  'outlok.com': 'outlook.com',
+  'iclud.com': 'icloud.com'
+};
+
+export interface EmailValidationResult {
+  isValid: boolean;
+  error?: string;
+  suggestion?: string;
+}
+
+export function validateEmailFormat(email: string): EmailValidationResult {
+  const clean = email.trim().toLowerCase();
+  if (!clean) {
+    return { isValid: false, error: 'Email address is required.' };
+  }
+
+  // RFC standard email regex
+  const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+  if (!emailRegex.test(clean)) {
+    return { isValid: false, error: 'Please enter a valid email address (e.g. name@gmail.com).' };
+  }
+
+  const parts = clean.split('@');
+  if (parts.length !== 2) {
+    return { isValid: false, error: 'Invalid email address.' };
+  }
+
+  const [localPart, domain] = parts;
+
+  // Local part checks
+  if (localPart.length < 1 || localPart.length > 64) {
+    return { isValid: false, error: 'Email username must be between 1 and 64 characters.' };
+  }
+
+  // Domain checks
+  const domainParts = domain.split('.');
+  if (domainParts.length < 2) {
+    return { isValid: false, error: 'Email must contain a valid domain extension (e.g. .com, .edu).' };
+  }
+
+  const tld = domainParts[domainParts.length - 1];
+  if (tld.length < 2 || !/^[a-z]+$/.test(tld)) {
+    return { isValid: false, error: 'Invalid domain extension (e.g. .com, .in, .org).' };
+  }
+
+  // Check disposable domains
+  if (DISPOSABLE_DOMAINS.has(domain)) {
+    return { isValid: false, error: 'Disposable or temporary email addresses are not allowed.' };
+  }
+
+  // Check common typos
+  if (DOMAIN_TYPOS[domain]) {
+    const suggested = `${localPart}@${DOMAIN_TYPOS[domain]}`;
+    return {
+      isValid: false,
+      error: `Did you mean ${suggested}?`,
+      suggestion: suggested
+    };
+  }
+
+  return { isValid: true };
+}
+
 const AUTH_STORAGE_KEY = 'insta_fresh_auth_user';
 const USERS_STORAGE_KEY = 'insta_fresh_registered_users';
 
@@ -95,6 +176,34 @@ export const authService = {
     localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
   },
 
+  // Generate 6-digit confirmation code
+  generateVerificationCode(email: string): string {
+    const cleanEmail = email.trim().toLowerCase();
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    try {
+      sessionStorage.setItem(`otp_${cleanEmail}`, JSON.stringify({
+        code,
+        expiresAt: Date.now() + 15 * 60 * 1000 // 15 mins
+      }));
+    } catch {
+      // ignore
+    }
+    return code;
+  },
+
+  verifyCode(email: string, inputCode: string): boolean {
+    const cleanEmail = email.trim().toLowerCase();
+    try {
+      const stored = sessionStorage.getItem(`otp_${cleanEmail}`);
+      if (!stored) return false;
+      const parsed = JSON.parse(stored);
+      if (Date.now() > parsed.expiresAt) return false;
+      return parsed.code === inputCode.trim();
+    } catch {
+      return false;
+    }
+  },
+
   login(usernameOrEmail: string, password?: string): UserAccount {
     const users = this.getAllUsers();
     const cleanIdentifier = usernameOrEmail.trim().toLowerCase();
@@ -104,7 +213,7 @@ export const authService = {
     );
 
     if (!found) {
-      throw new Error('Account not found. Please sign up or create an account.');
+      throw new Error('Account not found. Please verify your username/email or sign up.');
     }
 
     if (found.provider === 'google' && !found.password) {
@@ -125,9 +234,10 @@ export const authService = {
     const cleanUsername = username.trim().toLowerCase();
     const cleanEmail = email.trim().toLowerCase();
 
-    // Validate email format
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
-      throw new Error('Please enter a valid email address.');
+    // Strict Email Validation
+    const emailVal = validateEmailFormat(cleanEmail);
+    if (!emailVal.isValid) {
+      throw new Error(emailVal.error || 'Invalid email address.');
     }
 
     // Validate username format
@@ -161,6 +271,7 @@ export const authService = {
       email: cleanEmail,
       password: password || '',
       provider: 'local',
+      isEmailVerified: true,
       bio: '',
       avatarUrl: `https://api.dicebear.com/7.x/identicon/svg?seed=${cleanUsername}`,
       createdAt: new Date().toISOString()
@@ -171,10 +282,38 @@ export const authService = {
     return newUser;
   },
 
+  updateEmail(newEmail: string): UserAccount {
+    const clean = newEmail.trim().toLowerCase();
+    const val = validateEmailFormat(clean);
+    if (!val.isValid) {
+      throw new Error(val.error || 'Invalid email address.');
+    }
+
+    const current = this.getCurrentUser();
+    if (!current) throw new Error('No active user session.');
+
+    const users = this.getAllUsers();
+    const conflict = users.some(u => u.id !== current.id && u.email.toLowerCase() === clean);
+    if (conflict) {
+      throw new Error('This email address is already in use by another account.');
+    }
+
+    const updated: UserAccount = {
+      ...current,
+      email: clean,
+      isEmailVerified: true
+    };
+
+    this.saveUserToRegistry(updated);
+    this.setCurrentUser(updated);
+    return updated;
+  },
+
   loginWithGoogle(googleEmail: string, fullName?: string, avatarUrl?: string): UserAccount {
     const cleanEmail = googleEmail.trim().toLowerCase();
-    if (!cleanEmail.includes('@') || (!cleanEmail.endsWith('@gmail.com') && !cleanEmail.endsWith('@googlemail.com') && !cleanEmail.includes('.'))) {
-      throw new Error('Please enter a valid Google Mail address (e.g. yourname@gmail.com).');
+    const emailVal = validateEmailFormat(cleanEmail);
+    if (!emailVal.isValid) {
+      throw new Error(emailVal.error || 'Please enter a valid Google Mail address.');
     }
 
     const users = this.getAllUsers();
@@ -201,6 +340,7 @@ export const authService = {
       fullName: displayName,
       email: cleanEmail,
       provider: 'google',
+      isEmailVerified: true,
       bio: '✨ Documenting my private memories via Google Mail',
       avatarUrl: avatarUrl || `https://api.dicebear.com/7.x/identicon/svg?seed=${finalUsername}`,
       createdAt: new Date().toISOString()

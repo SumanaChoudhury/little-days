@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { X, Shield, Download, Trash2, LogOut, Key, User, HardDrive, AlertTriangle, Database, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
-import { UserAccount } from '../lib/auth';
+import { X, Shield, Download, Trash2, LogOut, Key, User, HardDrive, AlertTriangle, Database, CheckCircle2, ChevronDown, ChevronUp, Mail, Edit3, Check } from 'lucide-react';
+import { UserAccount, authService, validateEmailFormat } from '../lib/auth';
 import { memoryStorage } from '../lib/storage';
 import { supabaseConfig, saveLocalSupabaseConfig } from '../lib/supabase';
 
@@ -10,6 +10,7 @@ interface SettingsModalProps {
   currentUser: UserAccount;
   onLogout: () => void;
   onDeleteAccount: () => void;
+  onUpdateUser?: (user: UserAccount) => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -17,11 +18,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onClose,
   currentUser,
   onLogout,
-  onDeleteAccount
+  onDeleteAccount,
+  onUpdateUser
 }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteInput, setDeleteInput] = useState('');
   const [isExporting, setIsExporting] = useState(false);
+
+  // Email update state
+  const [isEditingEmail, setIsEditingEmail] = useState(false);
+  const [emailInput, setEmailInput] = useState(currentUser.email);
+  const [emailError, setEmailError] = useState('');
+  const [emailSuccess, setEmailSuccess] = useState('');
 
   // Cloud DB Config Form
   const [showDbConfig, setShowDbConfig] = useState(false);
@@ -30,6 +38,32 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [dbSaved, setDbSaved] = useState(false);
 
   if (!isOpen) return null;
+
+  const emailValidation = isEditingEmail ? validateEmailFormat(emailInput) : { isValid: true };
+
+  const handleSaveEmail = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setEmailError('');
+    setEmailSuccess('');
+
+    const val = validateEmailFormat(emailInput);
+    if (!val.isValid) {
+      setEmailError(val.error || 'Please enter a valid email address.');
+      return;
+    }
+
+    try {
+      const updated = authService.updateEmail(emailInput);
+      if (onUpdateUser) {
+        onUpdateUser(updated);
+      }
+      setEmailSuccess('Email updated successfully!');
+      setIsEditingEmail(false);
+      setTimeout(() => setEmailSuccess(''), 3000);
+    } catch (err: any) {
+      setEmailError(err.message || 'Failed to update email');
+    }
+  };
 
   const handleExportAll = async () => {
     setIsExporting(true);
@@ -74,21 +108,109 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         {/* Body */}
         <div className="p-5 space-y-5 overflow-y-auto flex-1 text-xs text-neutral-700 dark:text-neutral-300">
           {/* User Account Info */}
-          <div className="flex items-center gap-3 p-3 rounded-xl bg-neutral-100 dark:bg-neutral-800">
-            <img
-              src={currentUser.avatarUrl}
-              alt={currentUser.username}
-              className="w-12 h-12 rounded-full object-cover border border-neutral-300 dark:border-neutral-700"
-            />
-            <div>
-              <span className="font-bold text-sm block text-black dark:text-white">
-                {currentUser.username}
-              </span>
-              <span className="text-neutral-500 block">{currentUser.email}</span>
-              <span className="text-[10px] text-emerald-500 font-semibold flex items-center gap-1 mt-0.5">
-                <Shield className="w-3 h-3" /> Private Memory Account (No Followers)
-              </span>
+          <div className="p-3.5 rounded-xl bg-neutral-100 dark:bg-neutral-800 space-y-3">
+            <div className="flex items-center gap-3">
+              <img
+                src={currentUser.avatarUrl}
+                alt={currentUser.username}
+                className="w-12 h-12 rounded-full object-cover border border-neutral-300 dark:border-neutral-700"
+              />
+              <div className="flex-1 min-w-0">
+                <span className="font-bold text-sm block text-black dark:text-white truncate">
+                  {currentUser.username}
+                </span>
+                <div className="flex items-center gap-1.5 text-neutral-500 text-xs">
+                  <Mail className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">{currentUser.email}</span>
+                </div>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-[10px] text-emerald-500 font-semibold flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" /> Verified {currentUser.provider === 'google' ? 'Google' : 'Email'}
+                  </span>
+                  <span className="text-[10px] text-neutral-400">·</span>
+                  <span className="text-[10px] text-neutral-500 font-medium flex items-center gap-1">
+                    <Shield className="w-3 h-3 text-sky-500" /> Private Vault
+                  </span>
+                </div>
+              </div>
             </div>
+
+            {/* Email change section */}
+            {!isEditingEmail ? (
+              <div className="pt-2 border-t border-neutral-200 dark:border-neutral-700 flex items-center justify-between">
+                <span className="text-[11px] text-neutral-500">Need to update your email?</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmailInput(currentUser.email);
+                    setEmailError('');
+                    setIsEditingEmail(true);
+                  }}
+                  className="text-[11px] font-semibold text-sky-500 hover:text-sky-600 flex items-center gap-1 transition-colors"
+                >
+                  <Edit3 className="w-3 h-3" /> Change Email
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleSaveEmail} className="pt-2 border-t border-neutral-200 dark:border-neutral-700 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
+                    Change Registered Email
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditingEmail(false);
+                      setEmailError('');
+                    }}
+                    className="text-[10px] text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200"
+                  >
+                    Cancel
+                  </button>
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="email"
+                    value={emailInput}
+                    onChange={(e) => {
+                      setEmailInput(e.target.value);
+                      setEmailError('');
+                    }}
+                    placeholder="Enter valid email (e.g. name@gmail.com)"
+                    className="flex-1 px-2.5 py-1.5 rounded-lg bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 text-xs text-black dark:text-white outline-none focus:border-sky-500"
+                  />
+                  <button
+                    type="submit"
+                    className="px-3 py-1.5 rounded-lg bg-sky-500 hover:bg-sky-600 text-white font-semibold text-xs transition-colors shrink-0 flex items-center gap-1"
+                  >
+                    <Check className="w-3.5 h-3.5" /> Save
+                  </button>
+                </div>
+
+                {/* Email typo suggestion */}
+                {emailValidation.suggestion && (
+                  <button
+                    type="button"
+                    onClick={() => setEmailInput(emailValidation.suggestion!)}
+                    className="text-[11px] text-amber-500 hover:underline block text-left"
+                  >
+                    💡 Did you mean <strong>{emailValidation.suggestion}</strong>? Click to apply.
+                  </button>
+                )}
+
+                {emailError && (
+                  <p className="text-[11px] text-red-500 flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3 shrink-0" /> {emailError}
+                  </p>
+                )}
+              </form>
+            )}
+
+            {emailSuccess && (
+              <p className="text-[11px] text-emerald-500 font-semibold flex items-center gap-1 pt-1">
+                <CheckCircle2 className="w-3.5 h-3.5" /> {emailSuccess}
+              </p>
+            )}
           </div>
 
           {/* Online Safe Database (Supabase) */}
