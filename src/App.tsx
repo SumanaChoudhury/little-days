@@ -355,6 +355,7 @@ export const App: React.FC = () => {
               setSelectedStoryIndex(idx >= 0 ? idx : 0);
             }}
             onOpenArchiveVault={() => setActiveTab('archive')}
+            onOpenCamera={() => setIsCameraOpen(true)}
           />
         )}
       </main>

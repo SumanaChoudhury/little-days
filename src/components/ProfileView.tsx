@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Grid,
   Bookmark,
@@ -11,7 +11,10 @@ import {
   Heart,
   X,
   Archive,
-  MoreHorizontal
+  MoreHorizontal,
+  Camera,
+  Upload,
+  Trash2
 } from 'lucide-react';
 import { MemoryPost, Highlight, UserProfile, Story } from '../types';
 
@@ -23,6 +26,7 @@ interface ProfileViewProps {
   onSelectPost: (post: MemoryPost) => void;
   onOpenStory: (story: Story) => void;
   onOpenArchiveVault: () => void;
+  onOpenCamera?: () => void;
 }
 
 export const ProfileView: React.FC<ProfileViewProps> = ({
@@ -32,10 +36,14 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   onUpdateProfile,
   onSelectPost,
   onOpenStory,
-  onOpenArchiveVault
+  onOpenArchiveVault,
+  onOpenCamera
 }) => {
   const [activeTab, setActiveTab] = useState<'posts' | 'saved' | 'archive'>('posts');
   const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [showAvatarModal, setShowAvatarModal] = useState(false);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Edit form state
   const [editName, setEditName] = useState(profile.fullName);
@@ -51,6 +59,42 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const displayedMemories =
     activeTab === 'saved' ? bookmarkedMemories : activeTab === 'archive' ? archivedMemories : memories;
 
+  const handleAvatarFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('Please select a valid image file (JPEG, PNG, WEBP).');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = event => {
+      const dataUrl = event.target?.result as string;
+      if (dataUrl) {
+        setEditAvatar(dataUrl);
+        onUpdateProfile({
+          ...profile,
+          avatarUrl: dataUrl
+        });
+        setShowAvatarModal(false);
+      }
+    };
+    reader.readAsDataURL(file);
+    // Reset file input so same file can be selected again if needed
+    e.target.value = '';
+  };
+
+  const handleRemovePhoto = () => {
+    const defaultAvatar = `https://api.dicebear.com/7.x/identicon/svg?seed=${profile.username || 'user'}`;
+    setEditAvatar(defaultAvatar);
+    onUpdateProfile({
+      ...profile,
+      avatarUrl: defaultAvatar
+    });
+    setShowAvatarModal(false);
+  };
+
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
     onUpdateProfile({
@@ -64,16 +108,51 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto px-4 py-4 md:py-8 select-none">
+    <div className="w-full max-w-4xl mx-auto px-4 py-4 md:py-8 select-none animate-fade-in">
+      {/* Hidden file input for uploading profile picture */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        accept="image/*"
+        onChange={handleAvatarFileSelect}
+        className="hidden"
+      />
+
       {/* 1. Profile Header (Instagram Desktop/Mobile layout) */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 sm:gap-16 mb-8">
-        {/* Avatar */}
-        <div className="w-20 h-20 sm:w-36 sm:h-36 rounded-full p-[2.5px] bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888] shrink-0 self-center sm:self-auto">
-          <img
-            src={profile.avatarUrl}
-            alt={profile.username}
-            className="w-full h-full rounded-full object-cover border-2 sm:border-4 border-white dark:border-black"
-          />
+        {/* Interactive Avatar with Camera Overlay & Click Handler */}
+        <div className="flex flex-col items-center gap-2 shrink-0 self-center sm:self-auto">
+          <div
+            onClick={() => setShowAvatarModal(true)}
+            className="relative w-24 h-24 sm:w-36 sm:h-36 rounded-full p-[2.5px] bg-gradient-to-tr from-[#f09433] via-[#dc2743] to-[#bc1888] cursor-pointer group transition-transform active:scale-95"
+            title="Click to change profile picture"
+          >
+            <img
+              src={profile.avatarUrl}
+              alt={profile.username}
+              className="w-full h-full rounded-full object-cover border-2 sm:border-4 border-white dark:border-black group-hover:brightness-90 transition-all"
+            />
+
+            {/* Hover Camera Overlay (Desktop) */}
+            <div className="absolute inset-0 rounded-full flex flex-col items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity text-white">
+              <Camera className="w-6 h-6 stroke-[2]" />
+              <span className="text-[10px] font-bold mt-1">Change</span>
+            </div>
+
+            {/* Visible Camera Badge (Mobile) */}
+            <div className="sm:hidden absolute bottom-0 right-0 w-7 h-7 rounded-full bg-[#0095f6] text-white flex items-center justify-center border-2 border-white dark:border-black shadow-md">
+              <Camera className="w-3.5 h-3.5" />
+            </div>
+          </div>
+
+          {/* Direct "Change photo" text link */}
+          <button
+            type="button"
+            onClick={() => setShowAvatarModal(true)}
+            className="text-xs font-semibold text-[#0095f6] hover:text-[#1877f2] transition-colors"
+          >
+            Change profile picture
+          </button>
         </div>
 
         {/* Profile Info */}
@@ -99,6 +178,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             <button
               onClick={() => setIsEditingProfile(true)}
               className="p-1.5 hover:opacity-70 text-black dark:text-white"
+              title="Profile Settings"
             >
               <Settings className="w-5 h-5" />
             </button>
@@ -125,10 +205,15 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             <h3 className="font-semibold text-black dark:text-white">{profile.fullName}</h3>
             <span className="text-xs text-neutral-400 block font-normal">Personal Memory Vault 🔒</span>
             <p className="whitespace-pre-line text-neutral-800 dark:text-neutral-200 leading-relaxed font-normal">
-              {profile.bio}
+              {profile.bio || 'Capturing moments, preserved forever.'}
             </p>
             {profile.website && (
-              <a href="#" className="font-semibold text-[#00376b] dark:text-[#e0f1ff] hover:underline block">
+              <a
+                href={profile.website}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs font-semibold text-[#00376b] dark:text-[#e0f1ff] hover:underline block"
+              >
                 {profile.website}
               </a>
             )}
@@ -137,24 +222,26 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       </div>
 
       {/* 2. Story Highlights Tray */}
-      <div className="py-2 mb-6 border-b border-neutral-200 dark:border-neutral-800 overflow-x-auto no-scrollbar">
-        <div className="flex items-center gap-6 min-w-max">
+      <div className="mb-8">
+        <div className="flex items-center gap-4 sm:gap-6 overflow-x-auto no-scrollbar py-2">
           {highlights.map(hl => (
             <div
               key={hl.id}
               onClick={() => {
                 if (hl.stories.length > 0) onOpenStory(hl.stories[0]);
               }}
-              className="flex flex-col items-center gap-1.5 cursor-pointer group"
+              className="flex flex-col items-center gap-1.5 cursor-pointer group shrink-0"
             >
-              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full p-[2px] border-2 border-neutral-300 dark:border-neutral-700 group-hover:scale-105 transition-transform">
-                <img
-                  src={hl.coverUrl}
-                  alt={hl.title}
-                  className="w-full h-full rounded-full object-cover"
-                />
+              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full p-[2px] border border-[#dbdbdb] dark:border-[#383838] group-hover:scale-105 transition-transform">
+                <div className="w-full h-full rounded-full p-[2px] bg-white dark:bg-black">
+                  <img
+                    src={hl.coverUrl}
+                    alt={hl.title}
+                    className="w-full h-full rounded-full object-cover"
+                  />
+                </div>
               </div>
-              <span className="text-xs font-semibold text-black dark:text-white max-w-[75px] truncate text-center">
+              <span className="text-xs font-medium text-black dark:text-white max-w-[74px] truncate text-center">
                 {hl.title}
               </span>
             </div>
@@ -162,13 +249,13 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
           {/* New highlight button */}
           <div
-            onClick={() => alert('New highlight created from stories!')}
-            className="flex flex-col items-center gap-1.5 cursor-pointer group"
+            onClick={() => alert('New highlights are created from your active Stories! Click the Highlight button while watching any story.')}
+            className="flex flex-col items-center gap-1.5 cursor-pointer group shrink-0"
           >
-            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-2 border-dashed border-neutral-300 dark:border-neutral-700 flex items-center justify-center text-neutral-400 group-hover:border-neutral-500 transition-colors">
-              <Plus className="w-6 h-6" />
+            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full border border-neutral-300 dark:border-neutral-700 flex items-center justify-center text-neutral-400 group-hover:border-neutral-500 transition-colors">
+              <Plus className="w-6 h-6 stroke-[1.5]" />
             </div>
-            <span className="text-xs font-semibold text-neutral-400">New</span>
+            <span className="text-xs font-normal text-neutral-500">New</span>
           </div>
         </div>
       </div>
@@ -214,49 +301,73 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
       {/* 4. 3x3 Photo Grid (Instagram Signature Grid) */}
       {displayedMemories.length === 0 ? (
-        <div className="py-16 text-center text-neutral-400">
-          <p className="text-sm font-semibold">
+        <div className="py-16 text-center text-neutral-400 space-y-2">
+          <div className="w-14 h-14 rounded-full border border-neutral-300 dark:border-neutral-700 flex items-center justify-center mx-auto text-neutral-400">
+            <Camera className="w-6 h-6 stroke-[1.5]" />
+          </div>
+          <p className="text-sm font-semibold text-black dark:text-white">
             {activeTab === 'saved'
-              ? 'No saved memories yet.'
+              ? 'No saved memories yet'
               : activeTab === 'archive'
-              ? 'No memories older than 90 days.'
-              : 'No posts yet.'}
+              ? 'No archived memories (90d+) yet'
+              : 'Share Photos'}
+          </p>
+          <p className="text-xs text-neutral-500 max-w-xs mx-auto">
+            When you take pictures or upload memories, they will appear here on your private profile grid.
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-3 gap-1 sm:gap-4">
-          {displayedMemories.map(m => {
-            const hasMultiple = m.media.length > 1;
-            const isVideo = m.media[0]?.type === 'video';
+        <div className="grid grid-cols-3 gap-1 sm:gap-7">
+          {displayedMemories.map(memory => {
+            const firstMedia = memory.media[0];
+            const hasMultiple = memory.media.length > 1;
+            const isVideo = firstMedia?.type === 'video';
 
             return (
               <div
-                key={m.id}
-                onClick={() => onSelectPost(m)}
-                className="relative aspect-square group cursor-pointer overflow-hidden bg-neutral-100 dark:bg-neutral-900 select-none"
+                key={memory.id}
+                onClick={() => onSelectPost(memory)}
+                className="relative aspect-square cursor-pointer group bg-neutral-100 dark:bg-neutral-900 overflow-hidden"
               >
-                <img
-                  src={m.media[0]?.url}
-                  alt={m.caption || 'Photo'}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  loading="lazy"
-                />
+                {isVideo ? (
+                  <video
+                    src={firstMedia.url}
+                    className="w-full h-full object-cover"
+                    muted
+                    playsInline
+                  />
+                ) : (
+                  <img
+                    src={firstMedia?.url}
+                    alt={memory.caption}
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                )}
 
-                {/* Top right indicator */}
-                <div className="absolute top-2 right-2 text-white drop-shadow-md">
-                  {hasMultiple && <Layers className="w-4 h-4 stroke-[2.5]" />}
-                  {isVideo && <Film className="w-4 h-4 stroke-[2.5]" />}
-                </div>
-
-                {/* Hover overlay with likes and comment count */}
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-6 text-white text-sm font-bold">
-                  <div className="flex items-center gap-1.5">
-                    <Heart className="w-5 h-5 fill-white text-white" />
-                    <span>{m.isLiked ? '1' : '0'}</span>
+                {/* Multiple Media Badge */}
+                {hasMultiple && (
+                  <div className="absolute top-2 right-2 text-white drop-shadow-md">
+                    <Layers className="w-4 h-4" />
                   </div>
-                  {(m.personalNotes?.length || 0) > 0 && (
+                )}
+
+                {/* Video Badge */}
+                {isVideo && (
+                  <div className="absolute top-2 right-2 text-white drop-shadow-md">
+                    <Film className="w-4 h-4" />
+                  </div>
+                )}
+
+                {/* Hover overlay with Like / Comments count (Instagram Desktop style) */}
+                <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-6 text-white font-bold text-sm">
+                  <div className="flex items-center gap-1.5">
+                    <Heart className="w-5 h-5 fill-white" />
+                    <span>{memory.isLiked ? 1 : 0}</span>
+                  </div>
+                  {memory.personalNotes && memory.personalNotes.length > 0 && (
                     <div className="flex items-center gap-1.5">
-                      <span>{m.personalNotes.length} notes</span>
+                      <span>📝 {memory.personalNotes.length}</span>
                     </div>
                   )}
                 </div>
@@ -266,55 +377,115 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         </div>
       )}
 
+      {/* Change Profile Photo Action Sheet Modal */}
+      {showAvatarModal && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in select-none">
+          <div className="bg-white dark:bg-[#262626] rounded-2xl w-full max-w-sm overflow-hidden border border-[#dbdbdb] dark:border-[#383838] shadow-2xl text-center text-sm font-semibold divide-y divide-[#dbdbdb] dark:divide-[#383838]">
+            <div className="py-4 px-6 text-center">
+              <h3 className="text-base font-bold text-black dark:text-white">Change Profile Photo</h3>
+            </div>
+
+            {/* Upload Photo */}
+            <button
+              onClick={() => {
+                fileInputRef.current?.click();
+              }}
+              className="w-full py-3.5 text-[#0095f6] hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors font-bold"
+            >
+              Upload Photo from Device
+            </button>
+
+            {/* Take Photo with Camera */}
+            {onOpenCamera && (
+              <button
+                onClick={() => {
+                  setShowAvatarModal(false);
+                  onOpenCamera();
+                }}
+                className="w-full py-3.5 text-black dark:text-white hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors"
+              >
+                Take Photo with Camera
+              </button>
+            )}
+
+            {/* Remove Current Photo */}
+            <button
+              onClick={handleRemovePhoto}
+              className="w-full py-3.5 text-[#ed4956] hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors"
+            >
+              Remove Current Photo
+            </button>
+
+            {/* Cancel */}
+            <button
+              onClick={() => setShowAvatarModal(false)}
+              className="w-full py-3.5 text-neutral-500 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors font-normal"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Edit Profile Modal */}
       {isEditingProfile && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#262626] rounded-2xl w-full max-w-sm p-4 border border-[#dbdbdb] dark:border-[#383838] shadow-2xl">
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in select-none">
+          <div className="bg-white dark:bg-[#262626] rounded-2xl w-full max-w-sm p-5 border border-[#dbdbdb] dark:border-[#383838] shadow-2xl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-bold text-black dark:text-white">Edit Profile</h3>
-              <button onClick={() => setIsEditingProfile(false)}>
-                <X className="w-4 h-4 text-neutral-400" />
+              <button onClick={() => setIsEditingProfile(false)} className="text-neutral-400 hover:text-black dark:hover:text-white">
+                <X className="w-5 h-5" />
               </button>
+            </div>
+
+            {/* Avatar Section inside Edit Profile */}
+            <div className="flex items-center gap-4 p-3 rounded-xl bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 mb-4">
+              <img
+                src={editAvatar || profile.avatarUrl}
+                alt={profile.username}
+                className="w-12 h-12 rounded-full object-cover border border-neutral-300 dark:border-neutral-600"
+              />
+              <div>
+                <span className="font-bold text-sm block text-black dark:text-white">{profile.username}</span>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="text-xs font-bold text-[#0095f6] hover:text-[#1877f2] transition-colors"
+                >
+                  Change profile photo
+                </button>
+              </div>
             </div>
 
             <form onSubmit={handleSaveProfile} className="space-y-3 text-xs">
               <div>
-                <label className="text-neutral-500 block mb-1">Name</label>
+                <label className="text-neutral-500 block mb-1 font-semibold uppercase text-[10px]">Name</label>
                 <input
                   type="text"
                   value={editName}
                   onChange={e => setEditName(e.target.value)}
-                  className="w-full p-2 rounded-lg bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 outline-none text-black dark:text-white"
+                  className="w-full p-2.5 rounded-lg bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 outline-none text-black dark:text-white focus:border-neutral-500"
                 />
               </div>
 
               <div>
-                <label className="text-neutral-500 block mb-1">Username</label>
+                <label className="text-neutral-500 block mb-1 font-semibold uppercase text-[10px]">Username</label>
                 <input
                   type="text"
                   value={editUsername}
                   onChange={e => setEditUsername(e.target.value)}
-                  className="w-full p-2 rounded-lg bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 outline-none text-black dark:text-white"
+                  className="w-full p-2.5 rounded-lg bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 outline-none text-black dark:text-white focus:border-neutral-500"
                 />
               </div>
 
               <div>
-                <label className="text-neutral-500 block mb-1">Bio</label>
+                <label className="text-neutral-500 block mb-1 font-semibold uppercase text-[10px]">Bio</label>
                 <textarea
                   rows={3}
                   value={editBio}
                   onChange={e => setEditBio(e.target.value)}
-                  className="w-full p-2 rounded-lg bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 outline-none text-black dark:text-white"
-                />
-              </div>
-
-              <div>
-                <label className="text-neutral-500 block mb-1">Avatar Image URL</label>
-                <input
-                  type="text"
-                  value={editAvatar}
-                  onChange={e => setEditAvatar(e.target.value)}
-                  className="w-full p-2 rounded-lg bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 outline-none text-black dark:text-white"
+                  placeholder="Tell your private world about yourself..."
+                  className="w-full p-2.5 rounded-lg bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 outline-none text-black dark:text-white focus:border-neutral-500 leading-relaxed"
                 />
               </div>
 
@@ -322,15 +493,15 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsEditingProfile(false)}
-                  className="px-3 py-1.5 rounded-lg bg-neutral-100 dark:bg-neutral-800 text-black dark:text-white font-semibold"
+                  className="px-4 py-2 rounded-lg bg-neutral-100 dark:bg-neutral-800 text-black dark:text-white font-semibold text-xs"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 rounded-lg bg-[#0095f6] text-white font-semibold"
+                  className="px-4 py-2 rounded-lg bg-[#0095f6] hover:bg-[#1877f2] text-white font-semibold text-xs transition-colors"
                 >
-                  Save
+                  Save Changes
                 </button>
               </div>
             </form>
