@@ -26,7 +26,7 @@ export const InstagramHeader: React.FC<InstagramHeaderProps> = ({
         {/* Brand / Logo */}
         <div className="flex items-center gap-2">
           <h1 className="font-script text-2xl font-bold tracking-tight text-[#262626] dark:text-white select-none">
-            little days.
+            MyMemories
           </h1>
           <span className="flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-[#f0f0f0] dark:bg-[#262626] text-[#737373] dark:text-[#a8a8a8] border border-black/5 dark:border-white/5">
             <Lock className="w-2.5 h-2.5 text-emerald-500" />

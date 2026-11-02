@@ -1,38 +1,36 @@
 import React from 'react';
 
-// Exact Instagram SVG icons
+// Exact MyMemories SVG wordmark logo
 export const InstagramLogo: React.FC<{ className?: string; width?: number; height?: number }> = ({
   className = '',
-  width = 103,
-  height = 29
+  width = 120,
+  height = 32
 }) => (
   <svg
-    aria-label="Instagram"
+    aria-label="MyMemories"
     className={className}
     fill="currentColor"
     height={height}
     role="img"
-    viewBox="0 0 103 29"
+    viewBox="0 0 145 32"
     width={width}
   >
-    <path d="M74.7 11.2c-.3-.8-.9-1.4-1.7-1.7-1.2-.4-5.9-.4-5.9-.4s-4.7 0-5.9.4c-.8.3-1.4.9-1.7 1.7-.4 1.2-.4 3.7-.4 3.7s0 2.5.4 3.7c.3.8.9 1.4 1.7 1.7 1.2.4 5.9.4 5.9.4s4.7 0 5.9-.4c.8-.3 1.4-.9 1.7-1.7.4-1.2.4-3.7.4-3.7s0-2.5-.4-3.7zm-8.2 5.5v-3.6l3.4 1.8-3.4 1.8z" fill="none" />
-    <path d="M12.2 8.4c-2.1 0-3.8 1.7-3.8 3.8s1.7 3.8 3.8 3.8 3.8-1.7 3.8-3.8-1.7-3.8-3.8-3.8zm0 6.2c-1.3 0-2.4-1.1-2.4-2.4s1.1-2.4 2.4-2.4 2.4 1.1 2.4 2.4-1.1 2.4-2.4 2.4z" />
-    <circle cx="17.6" cy="6.8" r="0.9" />
-    <path d="M21.5 6.4c-.1-.7-.3-1.3-.8-1.8s-1.1-.7-1.8-.8c-.8-.1-2.7-.1-6.7-.1s-5.9 0-6.7.1c-.7.1-1.3.3-1.8.8s-.7 1.1-.8 1.8c-.1.8-.1 2.7-.1 6.7s0 5.9.1 6.7c.1.7.3 1.3.8 1.8s1.1.7 1.8.8c.8.1 2.7.1 6.7.1s5.9 0 6.7-.1c.7-.1 1.3-.3 1.8-.8s.7-1.1.8-1.8c.1-.8.1-2.7.1-6.7s0-5.9-.1-6.7zm-1.8 13.2c-.1.5-.3.8-.6 1.1-.3.3-.6.5-1.1.6-.7.1-2.6.1-5.8.1s-5.1 0-5.8-.1c-.5-.1-.8-.3-1.1-.6-.3-.3-.5-.6-.6-1.1-.1-.7-.1-2.6-.1-5.8s0-5.1.1-5.8c.1-.5.3-.8.6-1.1.3-.3.6-.5 1.1-.6.7-.1 2.6-.1 5.8-.1s5.1 0 5.8.1c.5.1.8.3 1.1.6.3.3.5.6.6 1.1.1.7.1 2.6.1 5.8s0 5.1-.1 5.8z" />
-    {/* Instagram Wordmark Text */}
+    {/* MyMemories Wordmark Text */}
     <text
-      x="27"
-      y="21"
+      x="2"
+      y="23"
       fontFamily="'Playfair Display', Georgia, 'Brush Script MT', cursive, serif"
-      fontSize="24"
+      fontSize="26"
       fontStyle="italic"
       fontWeight="700"
       letterSpacing="-0.5px"
     >
-      Instagram
+      MyMemories
     </text>
   </svg>
 );
+
+export const MyMemoriesLogo = InstagramLogo;
 
 export const HomeIcon: React.FC<{ filled?: boolean; className?: string }> = ({ filled, className = 'w-6 h-6' }) => (
   filled ? (

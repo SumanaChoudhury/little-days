@@ -36,7 +36,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     try {
       const memories = memoryStorage.getMemories();
       const blob = await memoryStorage.createMonthlyArchive('Full_Backup', memories);
-      memoryStorage.triggerDownload(blob, `instagram_full_backup_${currentUser.username}.zip`);
+      memoryStorage.triggerDownload(blob, `mymemories_full_backup_${currentUser.username}.zip`);
       alert('Full memory archive backup downloaded successfully!');
     } catch (e: any) {
       alert(e.message || 'Export failed');

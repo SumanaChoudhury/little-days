@@ -116,7 +116,7 @@ export const CameraModal: React.FC<CameraModalProps> = ({
           >
             <X className="w-5 h-5" />
           </button>
-          <span className="text-xs font-bold uppercase tracking-wider">Instagram Camera</span>
+          <span className="text-xs font-bold uppercase tracking-wider">MyMemories Camera</span>
           <button
             onClick={handleFlipCamera}
             className="p-2 rounded-full bg-black/40 hover:bg-black/70 backdrop-blur-md"

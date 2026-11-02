@@ -34,9 +34,9 @@ export const MobileTopBar: React.FC<MobileTopBarProps> = ({
           <Camera className="w-6 h-6 stroke-[2]" />
         </button>
 
-        {/* Instagram Wordmark Logo */}
+        {/* MyMemories Wordmark Logo */}
         <div onClick={() => setActiveTab('feed')} className="cursor-pointer text-black dark:text-white flex items-center">
-          <InstagramLogo width={102} height={28} />
+          <InstagramLogo width={118} height={28} />
         </div>
       </div>
 

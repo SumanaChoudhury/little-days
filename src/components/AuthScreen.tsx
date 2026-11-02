@@ -130,7 +130,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess }) => {
                     Your Life in Pictures.
                   </h3>
                   <p className="text-xs text-white/80 mt-2 leading-relaxed">
-                    Zero algorithms, zero followers, zero public noise. Document your days in a familiar Instagram experience that is completely private to you.
+                    Zero algorithms, zero followers, zero public noise. Document your days in a familiar MyMemories experience that is completely private to you.
                   </p>
                 </div>
               </div>
@@ -140,15 +140,15 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess }) => {
           {/* Right Login / Sign Up Card */}
           <div className="w-full max-w-[360px] flex flex-col gap-3">
             <div className="bg-white dark:bg-black border border-[#dbdbdb] dark:border-[#262626] p-7 flex flex-col items-center sm:rounded-sm shadow-xs">
-              {/* Instagram Wordmark */}
+              {/* MyMemories Wordmark */}
               <div className="my-5 text-black dark:text-white flex justify-center">
-                <InstagramLogo width={175} height={51} />
+                <InstagramLogo width={190} height={48} />
               </div>
 
               <p className="text-xs text-neutral-500 font-medium text-center mb-5 leading-normal">
                 {isSignUp
-                  ? 'Sign up to build your private Instagram memory vault.'
-                  : 'Log in to your private Instagram archive.'}
+                  ? 'Sign up to build your private MyMemories vault.'
+                  : 'Log in to your private MyMemories archive.'}
               </p>
 
               {/* Continue with Google Mail Button */}
@@ -458,7 +458,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess }) => {
             </div>
 
             <p className="text-xs text-neutral-500 leading-normal">
-              Connect your Google Mail account to access your private Instagram memory archive safely.
+              Connect your Google Mail account to access your private MyMemories vault safely.
             </p>
 
             <form onSubmit={handleGoogleSubmit} className="space-y-3">
@@ -528,11 +528,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess }) => {
           <span>Privacy</span>
           <span>Terms</span>
           <span>Locations</span>
-          <span>Instagram Lite</span>
+          <span>MyMemories Web</span>
           <span>Threads</span>
         </div>
         <p className="text-[10px] uppercase font-medium">
-          © 2026 INSTAGRAM • YOUR PRIVATE MEMORY ARCHIVE
+          © 2026 MYMEMORIES • YOUR PRIVATE MEMORY ARCHIVE
         </p>
       </footer>
     </div>

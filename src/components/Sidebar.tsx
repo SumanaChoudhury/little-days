@@ -50,17 +50,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
     <aside className="hidden md:flex flex-col justify-between fixed left-0 top-0 bottom-0 w-[72px] xl:w-[244px] border-r border-[#dbdbdb] dark:border-[#262626] bg-white dark:bg-black px-3 py-5 z-30 transition-all select-none overflow-y-auto no-scrollbar">
       {/* Top Section */}
       <div className="flex flex-col gap-4">
-        {/* Instagram Logo */}
+        {/* MyMemories Logo */}
         <div
           onClick={() => setActiveTab('feed')}
           className="cursor-pointer px-2 py-2 flex items-center h-10"
-          title="Instagram"
+          title="MyMemories"
         >
           <div className="hidden xl:block text-black dark:text-white">
-            <InstagramLogo width={105} height={30} />
+            <InstagramLogo width={125} height={32} />
           </div>
           <div className="xl:hidden text-black dark:text-white flex items-center justify-center w-full">
-            <svg aria-label="Instagram" fill="currentColor" height="24" role="img" viewBox="0 0 24 24" width="24">
+            <svg aria-label="MyMemories" fill="currentColor" height="24" role="img" viewBox="0 0 24 24" width="24">
               <rect x="2" y="2" width="20" height="20" rx="5" ry="5" fill="none" stroke="currentColor" strokeWidth="2" />
               <circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" strokeWidth="2" />
               <circle cx="17.5" cy="6.5" r="1" />

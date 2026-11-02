@@ -1,4 +1,4 @@
-# little days. 📸 — Private Visual Memory Archive (Instagram Clone)
+# MyMemories 📸 — Private Visual Memory Archive
 
 > **"Your life deserves a place of its own. Not everything needs to be posted for other people."**
 

@@ -63,7 +63,7 @@ export const FeedView: React.FC<FeedViewProps> = ({
 
             <div>
               <h3 className="text-base font-bold text-black dark:text-white">
-                Welcome to Your Private Instagram
+                Welcome to Your Private MyMemories
               </h3>
               <p className="text-xs text-neutral-500 mt-1 max-w-xs mx-auto leading-normal">
                 You haven't added any memories yet. Click pictures or upload photos and videos to start building your private archive!
@@ -171,7 +171,7 @@ export const FeedView: React.FC<FeedViewProps> = ({
             <span>About</span> • <span>Help</span> • <span>Press</span> • <span>API</span> • <span>Jobs</span> • <span>Privacy</span> • <span>Terms</span> • <span>Locations</span> • <span>Language</span>
           </p>
           <p className="text-[10px] text-neutral-400 uppercase tracking-wider font-semibold">
-            © 2026 INSTAGRAM • YOUR PRIVATE MEMORY ARCHIVE
+            © 2026 MYMEMORIES • YOUR PRIVATE MEMORY ARCHIVE
           </p>
         </div>
       </div>

@@ -1,12 +1,12 @@
 # =========================================================================
-# Render Blueprint Specification for little days.
+# Render Blueprint Specification for MyMemories
 # =========================================================================
 # Deploy this project directly to Render (https://render.com)
 # =========================================================================
 
 services:
   - type: web
-    name: little-days
+    name: mymemories
     runtime: static
     buildCommand: npm install && npm run build
     staticPublishPath: ./dist
